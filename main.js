@@ -164,6 +164,16 @@
     });
   }
 
+  /* ---------- portrait appears next to the cursor over the name ---------- */
+  if (FINE) {
+    var me = document.createElement('img'); me.className = 'peek me-peek'; me.src = 'img/joy.jpg'; me.alt = ''; me.setAttribute('aria-hidden', 'true'); document.body.appendChild(me);
+    $$('.me').forEach(function (n) {
+      n.addEventListener('mouseenter', function () { me.classList.add('on'); });
+      n.addEventListener('mouseleave', function () { me.classList.remove('on'); });
+      n.addEventListener('mousemove', function (e) { me.style.transform = 'translate(' + (e.clientX + 24) + 'px,' + (e.clientY + 18) + 'px)'; });
+    });
+  }
+
   /* ---------- footer J draws itself once ---------- */
   var g = $('.glyph');
   if (g) new IntersectionObserver(function (es, o) { es.forEach(function (e) { if (e.isIntersecting) { g.classList.add('draw'); o.disconnect(); } }); }, { threshold: 0.4 }).observe(g);
