@@ -89,7 +89,7 @@
     es.forEach(function (en) {
       if (en.isIntersecting) { var p = en.target.play(); if (p && p.catch) p.catch(function () {}); } else en.target.pause();
     });
-  }, { root: stage, rootMargin: '0px 300px' });
+  }, { root: stage, rootMargin: '0px 60%' });
   $$('video', track).forEach(function (v) { vio.observe(v); });
 
   var jumping = false, glideId = 0;
