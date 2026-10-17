@@ -38,15 +38,23 @@
   }
   function pad() { return parseFloat(getComputedStyle(track).paddingLeft) || 0; }
   function wrap() {
-    if (!loopW) return;
+    if (!loopW || jumping) return;
     if (stage.scrollLeft < loopW * 0.5) stage.scrollLeft += loopW;
     else if (stage.scrollLeft > loopW * 1.5) stage.scrollLeft -= loopW;
   }
+  // the counter reads what is actually on screen (clones included), so it is right wherever the loop is
+  originals.forEach(function (p, i) { p.dataset.i = i; });
+  $$('.proj.clone', track).forEach(function (c, i) { c.dataset.i = i % originals.length; });
   function updateCount() {
     var vis = originals.filter(function (p) { return !p.hidden; }); if (!vis.length) { count.textContent = ''; return; }
-    var base = vis[0].offsetLeft - pad(), x = ((stage.scrollLeft - base) % loopW + loopW) % loopW, cur = 0;
-    vis.forEach(function (p, i) { if (p.offsetLeft - vis[0].offsetLeft - x < stage.clientWidth * 0.5) cur = i; });
-    count.textContent = String(cur + 1).padStart(2, '0') + ' / ' + String(vis.length).padStart(2, '0') + '  ' + $('.cap b', vis[cur]).textContent;
+    var sl = stage.getBoundingClientRect().left, edge = stage.clientWidth * 0.35, best = null, bestL = -Infinity;
+    $$('.proj', track).forEach(function (p) {
+      if (p.hidden) return;
+      var l = p.getBoundingClientRect().left - sl;
+      if (l <= edge && l > bestL) { bestL = l; best = p; }
+    });
+    var o = best ? originals[+best.dataset.i] : vis[0], n = vis.indexOf(o) + 1;
+    count.textContent = String(n).padStart(2, '0') + ' / ' + String(vis.length).padStart(2, '0') + '  ' + $('.cap b', o).textContent;
   }
   stage.addEventListener('scroll', function () { wrap(); updateCount(); }, { passive: true });
   // parallax: as the section passes through the viewport the strip drifts sideways, hinting it can be scrolled
@@ -65,6 +73,7 @@
   var dragX = null, startL = 0, moved = false;
   stage.addEventListener('pointerdown', function (e) {
     if (e.pointerType !== 'mouse' || e.button) return;
+    glideId++; jumping = false;
     dragX = e.clientX; startL = stage.scrollLeft; moved = false; stage.classList.add('drag');
   });
   addEventListener('pointermove', function (e) {
@@ -83,11 +92,30 @@
   }, { root: stage, rootMargin: '0px 300px' });
   $$('video', track).forEach(function (v) { vio.observe(v); });
 
+  var jumping = false, glideId = 0;
+  // own easing for horizontal jumps: native smooth scrolling gets cancelled when the page scrolls vertically at the same time
+  function glide(target) {
+    var from = stage.scrollLeft, d = target - from, t0 = null, dur = REDUCED ? 0 : 1100, id = ++glideId;
+    jumping = true;
+    function step(ts) {
+      if (id !== glideId) return;
+      if (t0 === null) t0 = ts;
+      var k = dur ? Math.min(1, (ts - t0) / dur) : 1, e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+      stage.scrollLeft = from + d * e;
+      if (k < 1) requestAnimationFrame(step); else { jumping = false; updateCount(); }
+    }
+    requestAnimationFrame(step);
+    // fallback when the tab is not painting frames: land on the target directly
+    setTimeout(function () { if (id === glideId && t0 === null) { stage.scrollLeft = target; jumping = false; updateCount(); } }, 200);
+  }
   function goTo(id) {
     var el = document.getElementById(id); if (!el) return;
     var top = section.getBoundingClientRect().top + scrollY - (innerHeight - section.offsetHeight) / 2;
     scrollTo({ top: top, behavior: REDUCED ? 'auto' : 'smooth' });
-    stage.scrollTo({ left: el.offsetLeft - pad() - drift, behavior: REDUCED ? 'auto' : 'smooth' });
+    // target inside the middle copy; if it sits past the wrap point use the identical clone one loop earlier
+    var target = el.offsetLeft - pad();
+    if (target > loopW * 1.5) target -= loopW;
+    glide(target);
   }
 
   /* ---------- index & filters ---------- */
@@ -221,7 +249,7 @@
     var side = 0;  // -1 left edge, 1 right edge, 0 middle of the strip
     stage.addEventListener('click', function (e) {
       if (!side || moved) return;
-      stage.scrollBy({ left: side * stage.clientWidth * 0.6, behavior: REDUCED ? 'auto' : 'smooth' });
+      glide(stage.scrollLeft + side * stage.clientWidth * 0.6);
     });
     var mx = -100, my = -100, cxp = -100, cyp = -100;
     addEventListener('mousemove', function (e) {
